@@ -9,7 +9,6 @@ import {
   Loader2,
   CheckCircle,
   FileText,
-  Home,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import Header from "../components/header";
@@ -20,26 +19,29 @@ import axios from "axios";
 export const API_URL = import.meta.env.VITE_API;
 
 export default function CourseCRUD() {
-  const token = JSON.parse(localStorage.getItem("loginToken")).data;
-  console.log("🚀 ~ CourseCRUD ~ token:", token);
+  // ✅ แก้ 1: ย้าย token เข้า useMemo/ไว้ข้างบนเฉยๆ แต่เอา console.log ออก
+  const token = JSON.parse(localStorage.getItem("loginToken"))?.data;
 
   const [teachers, setTeachers] = useState([]);
   const [load, setLoad] = useState(true);
+
   const getTeacher = async () => {
     try {
-      const professors = await axios.get(API_URL + "/get-all-professors");
-      setTeachers(professors.data.data);
-      console.log(
-        "🚀 ~ getAllList ~ professors.data.data:",
-        professors.data.data,
-      );
+      const raw = localStorage.getItem("loginToken");
+      const authToken = raw ? JSON.parse(raw)?.token : null;
+
+      const professors = await axios.get(API_URL + "/get-all-professors", {
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+      });
+      setTeachers(professors.data.data || []);
     } catch (error) {
-      console.error(error);
-      Swal.fire("โปรดตรวจสอบเครือข่าย", "", "error");
+      console.error("getTeacher error:", error);
+      setTeachers([]);
     } finally {
       setLoad(false);
     }
   };
+
   useEffect(() => {
     getTeacher();
   }, []);
@@ -54,14 +56,10 @@ export default function CourseCRUD() {
     teacher_name: "",
   });
 
-  // เปลี่ยน URL ตามที่คุณตั้งค่าใน .env
-
-  // Load data from API on mount
   useEffect(() => {
     fetchCourses();
   }, []);
 
-  // Fetch all courses
   const fetchCourses = async () => {
     try {
       setLoading(true);
@@ -88,28 +86,22 @@ export default function CourseCRUD() {
       setLoading(true);
 
       if (editingCourse) {
-        // Update existing course
         const res = await axios.put(
           `${API_URL}/update-subject/${editingCourse.course_id}`,
           formData,
         );
-
         if (res.data.err) {
           return Swal.fire(res.data.err, "ไม่สามารถบันทึกได้", "warning");
         }
-
         if (res.status === 200 || res.status === 201) {
           fetchCourses();
           Swal.fire("บันทึกข้อมูลแล้ว", "", "success");
         }
       } else {
-        // Add new course
         const res = await axios.post(`${API_URL}/create-subject`, formData);
-
         if (res.data.err) {
           return Swal.fire(res.data.err, "ไม่สามารถบันทึกได้", "warning");
         }
-
         if (res.status === 200 || res.status === 201) {
           fetchCourses();
           Swal.fire("บันทึกข้อมูลแล้ว", "", "success");
@@ -179,7 +171,7 @@ export default function CourseCRUD() {
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-gray-800">
-                  {token?.role == "1" ? "เช็คชื่อ" : "  ระบบจัดการรายวิชา"}
+                  {token?.role == "1" ? "เช็คชื่อ" : "ระบบจัดการรายวิชา"}
                 </h1>
                 {token?.role !== "1" && (
                   <p className="text-gray-500 mt-1">
@@ -220,108 +212,92 @@ export default function CourseCRUD() {
               <table className="w-full">
                 <thead className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
                   <tr>
-                    <th className="px-6 py-4 text-left text-sm font-semibold">
-                      ลำดับ
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold">
-                      รหัสวิชา
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold">
-                      ชื่อรายวิชา
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold">
-                      อาจารย์ผู้สอน
-                    </th>
-                    <th className="px-6 py-4 text-center text-sm font-semibold">
-                      จัดการ
-                    </th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold">ลำดับ</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold">รหัสวิชา</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold">ชื่อรายวิชา</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold">อาจารย์ผู้สอน</th>
+                    <th className="px-6 py-4 text-center text-sm font-semibold">จัดการ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {courses.map((course, index) => {
-                    console.log("🚀 ~ CourseCRUD ~ token:", token);
-                    return (
-                      <tr
-                        key={course.course_id}
-                        className="hover:bg-blue-50 transition-colors"
-                      >
-                        <td className="px-6 py-4 text-gray-700">{index + 1}</td>
-                        <td className="px-6 py-4">
-                          <span className="font-semibold text-blue-600">
-                            {course.course_id}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-gray-800 font-medium">
-                          {token?.role == "1" ? (
-                            <Link
-                              to={`/check-manual/${course.course_id}/${
-                                JSON.parse(localStorage.getItem("loginToken"))
-                                  .data?.student_id
-                              }`}
-                              className="hover:text-blue-500 hover:underline"
-                            >
-                              {" "}
-                              {course.course_name}
-                            </Link>
+                  {/* ✅ แก้ 3: เอา console.log ออกจาก .map() */}
+                  {courses.map((course, index) => (
+                    <tr
+                      key={course.course_id}
+                      className="hover:bg-blue-50 transition-colors"
+                    >
+                      <td className="px-6 py-4 text-gray-700">{index + 1}</td>
+                      <td className="px-6 py-4">
+                        <span className="font-semibold text-blue-600">
+                          {course.course_id}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-gray-800 font-medium">
+                        {token?.role == "1" ? (
+                          <Link
+                            to={`/check-manual/${course.course_id}/${
+                              JSON.parse(localStorage.getItem("loginToken"))
+                                ?.data?.student_id
+                            }`}
+                            className="hover:text-blue-500 hover:underline"
+                          >
+                            {course.course_name}
+                          </Link>
+                        ) : (
+                          <p>{course.course_name}</p>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-gray-700">
+                        {course.teacher_name}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-center gap-2">
+                          {token?.role == "2" || token?.role == "3" ? (
+                            <>
+                              <button
+                                onClick={() => handleEdit(course)}
+                                disabled={loading}
+                                className="flex items-center gap-1 bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                                <span className="text-sm">แก้ไข</span>
+                              </button>
+                              <button
+                                onClick={() => handleDelete(course.course_id)}
+                                disabled={loading}
+                                className="flex items-center gap-1 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                <span className="text-sm">ลบ</span>
+                              </button>
+                            </>
                           ) : (
-                            <p> {course.course_name}</p>
+                            <Link
+                              className="flex items-center gap-2 p-2 rounded-md text-white bg-blue-500"
+                              to={`/class-detail/${course.course_id}/${token?.student_id}`}
+                            >
+                              <FileText size={18} />
+                              รายละเอียด
+                            </Link>
                           )}
-                        </td>
-                        <td className="px-6 py-4 text-gray-700">
-                          {course.teacher_name}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-center gap-2">
-                            {token?.role == "2" || token?.role == "3" ? (
-                              <>
-                                <button
-                                  onClick={() => handleEdit(course)}
-                                  disabled={loading}
-                                  className="flex items-center gap-1 bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                  title="แก้ไข"
-                                >
-                                  <Edit2 className="w-4 h-4" />
-                                  <span className="text-sm">แก้ไข</span>
-                                </button>
-                                <button
-                                  onClick={() => handleDelete(course.course_id)}
-                                  disabled={loading}
-                                  className="flex items-center gap-1 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                  title="ลบ"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                  <span className="text-sm">ลบ</span>
-                                </button>
-                              </>
-                            ) : (
-                              <Link
-                                className="flex items-center gap-2 p-2 rounded-md text-white bg-blue-500"
-                                to={`/class-detail/${course.course_id}/${token?.student_id}`}
-                              >
-                                <FileText size={18} />
-                                รายละเอียด
-                              </Link>
-                            )}
-                            {token?.role == "2" && (
-                              <Link
-                                className="flex items-center gap-2 p-2 rounded-md text-white bg-green-500"
-                                to={`/check-class/${course.course_id}`}
-                              >
-                                <CheckCircle size={18} />
-                                เช็คชื่อ
-                              </Link>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          {token?.role == "2" && (
+                            <Link
+                              className="flex items-center gap-2 p-2 rounded-md text-white bg-green-500"
+                              to={`/check-class/${course.course_id}`}
+                            >
+                              <CheckCircle size={18} />
+                              เช็คชื่อ
+                            </Link>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
           )}
 
-          {/* Table Footer */}
           {courses.length > 0 && (
             <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
               <p className="text-sm text-gray-600">
@@ -353,84 +329,80 @@ export default function CourseCRUD() {
               </div>
 
               <div className="p-6 space-y-5">
-                <>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      รหัสวิชา
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.course_id || ""}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          course_id: e.target.value,
-                        })
-                      }
-                      readOnly
-                      className="w-full px-4 py-3 bg-gray-200 border-2 border-gray-50 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
-                      placeholder="สร้างอัตโนมัติ"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      ชื่อวิชา
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.course_name || ""}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          course_name: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
-                      placeholder="การเขียนโปรแกรม"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    รหัสวิชา
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.course_id || ""}
+                    readOnly
+                    className="w-full px-4 py-3 bg-gray-200 border-2 border-gray-50 rounded-xl outline-none"
+                    placeholder="สร้างอัตโนมัติ"
+                  />
+                </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      ตั้งค่าเวลาเข้าเรียน
-                    </label>
-                    <input
-                      type="time"
-                      value={formData.time_check || ""}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          time_check: e.target.value, // เช่น "08:00"
-                        }))
-                      }
-                      className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl
-               focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    ชื่อวิชา
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.course_name || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, course_name: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
+                    placeholder="การเขียนโปรแกรม"
+                  />
+                </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      อาจารย์ผู้สอน
-                    </label>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    ตั้งค่าเวลาเข้าเรียน
+                  </label>
+                  <input
+                    type="time"
+                    value={formData.time_check || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        time_check: e.target.value,
+                      }))
+                    }
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    อาจารย์ผู้สอน
+                  </label>
+                  {/* ✅ แก้ 4: แสดง warning ถ้า teachers โหลดไม่ได้ */}
+                  {teachers.length === 0 ? (
+                    <p className="text-sm text-red-500">
+                      ไม่สามารถโหลดรายชื่ออาจารย์ได้ กรุณาลองใหม่
+                    </p>
+                  ) : (
                     <select
-                      value={formData.teacher_id}
-                      onChange={(option) =>
+                      value={formData.teacher_id || ""}
+                      onChange={(e) =>
                         setFormData((prev) => ({
                           ...prev,
-                          teacher_id: option.target.value,
+                          teacher_id: e.target.value,
                         }))
                       }
                       className="w-full p-2 rounded-lg border border-gray-200 outline"
                     >
-                      <option disabled>เลือกอาจารย์</option>
+                      <option value="" disabled>เลือกอาจารย์</option>
                       {teachers.map((t, index) => (
                         <option value={t?.id} key={index}>
                           {t.fullname}
                         </option>
                       ))}
                     </select>
-                  </div>
-                </>
+                  )}
+                </div>
 
                 <button
                   onClick={handleSubmit}
