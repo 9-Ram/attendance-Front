@@ -1,9 +1,10 @@
 import { useForm } from "react-hook-form";
-import { Lock, User, LogIn, GraduationCap, CreditCard } from "lucide-react";
+import { Lock, User, LogIn, GraduationCap, BookOpen } from "lucide-react";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import { API_URL } from "./Subject";
 import Swal from "sweetalert2";
+import { useState } from "react";
 
 const THAI_NAME_REGEX = /^[ก-๙\s]+$/;
 const STUDENT_ID_REGEX = /^\d{12}$/;
@@ -11,6 +12,8 @@ const USERNAME_REGEX = /^[a-zA-Z0-9]{6,}$/;
 const PASSWORD_REGEX = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).{6,}$/;
 
 function Register() {
+  const [role, setRole] = useState("student"); // "student" | "teacher"
+
   const {
     register,
     handleSubmit,
@@ -21,7 +24,8 @@ function Register() {
 
   const onSubmit = async (data) => {
     try {
-      const res = await axios.post(`${API_URL}/create-std`, data);
+      const payload = { ...data, role };
+      const res = await axios.post(`${API_URL}/create-std`, payload);
       if (res.data.err)
         return Swal.fire(res.data.err, "ไม่สามารถลงทะเบียนได้", "error");
 
@@ -40,6 +44,7 @@ function Register() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-600 via-teal-700 to-cyan-800 p-4">
       <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 w-full max-w-2xl">
+        {/* Icon */}
         <div className="flex justify-center mb-6">
           <div className="w-20 h-20 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl flex items-center justify-center">
             <GraduationCap className="w-10 h-10 text-white" />
@@ -50,12 +55,38 @@ function Register() {
           ลงทะเบียนผู้ใช้ใหม่
         </h2>
 
+        {/* Role Selector */}
+        <div className="flex rounded-2xl bg-white/10 p-1 mb-6 gap-1">
+          <button
+            type="button"
+            onClick={() => setRole("student")}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200
+              ${role === "student"
+                ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg"
+                : "text-white/60 hover:text-white"
+              }`}
+          >
+            <GraduationCap className="w-4 h-4" />
+            นักศึกษา
+          </button>
+          <button
+            type="button"
+            onClick={() => setRole("teacher")}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200
+              ${role === "teacher"
+                ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg"
+                : "text-white/60 hover:text-white"
+              }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            อาจารย์
+          </button>
+        </div>
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {/* ชื่อ-นามสกุล */}
           <div>
-            <label className="text-white text-sm mb-1 block">
-              ชื่อ-นามสกุล
-            </label>
+            <label className="text-white text-sm mb-1 block">ชื่อ-นามสกุล</label>
             <input
               className={inputClass(errors.fullName)}
               placeholder="นายสมชาย ใจดี"
@@ -68,34 +99,30 @@ function Register() {
               })}
             />
             {errors.fullName && (
-              <p className="text-red-500 text-xs mt-1">
-                {errors.fullName.message}
-              </p>
+              <p className="text-red-400 text-xs mt-1">{errors.fullName.message}</p>
             )}
           </div>
 
-          {/* รหัสนักศึกษา */}
-          <div>
-            <label className="text-white text-sm mb-1 block">
-              รหัสนักศึกษา
-            </label>
-            <input
-              className={inputClass(errors.studentId)}
-              placeholder="663170010324"
-              {...register("studentId", {
-                required: "กรุณากรอกรหัสนักศึกษา",
-                pattern: {
-                  value: STUDENT_ID_REGEX,
-                  message: "ต้องเป็นตัวเลข 12 หลักเท่านั้น",
-                },
-              })}
-            />
-            {errors.studentId && (
-              <p className="text-red-400 text-xs mt-1">
-                {errors.studentId.message}
-              </p>
-            )}
-          </div>
+          {/* รหัสนักศึกษา — แสดงเฉพาะนักศึกษา */}
+          {role === "student" && (
+            <div>
+              <label className="text-white text-sm mb-1 block">รหัสนักศึกษา</label>
+              <input
+                className={inputClass(errors.studentId)}
+                placeholder="663170010324"
+                {...register("studentId", {
+                  required: role === "student" ? "กรุณากรอกรหัสนักศึกษา" : false,
+                  pattern: {
+                    value: STUDENT_ID_REGEX,
+                    message: "ต้องเป็นตัวเลข 12 หลักเท่านั้น",
+                  },
+                })}
+              />
+              {errors.studentId && (
+                <p className="text-red-400 text-xs mt-1">{errors.studentId.message}</p>
+              )}
+            </div>
+          )}
 
           {/* Username */}
           <div>
@@ -112,9 +139,7 @@ function Register() {
               })}
             />
             {errors.username && (
-              <p className="text-red-400 text-xs mt-1">
-                {errors.username.message}
-              </p>
+              <p className="text-red-400 text-xs mt-1">{errors.username.message}</p>
             )}
           </div>
 
@@ -134,17 +159,13 @@ function Register() {
               })}
             />
             {errors.password && (
-              <p className="text-red-400 text-xs mt-1">
-                {errors.password.message}
-              </p>
+              <p className="text-red-400 text-xs mt-1">{errors.password.message}</p>
             )}
           </div>
 
           {/* Confirm Password */}
           <div>
-            <label className="text-white text-sm mb-1 block">
-              ยืนยันรหัสผ่าน
-            </label>
+            <label className="text-white text-sm mb-1 block">ยืนยันรหัสผ่าน</label>
             <input
               type="password"
               placeholder="ยืนยันรหัสผ่านอีกครั้ง"
@@ -155,9 +176,7 @@ function Register() {
               })}
             />
             {errors.confirmPassword && (
-              <p className="text-red-400 text-xs mt-1">
-                {errors.confirmPassword.message}
-              </p>
+              <p className="text-red-400 text-xs mt-1">{errors.confirmPassword.message}</p>
             )}
           </div>
 
@@ -166,7 +185,9 @@ function Register() {
             disabled={isSubmitting}
             className="w-full py-3 mt-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-semibold"
           >
-            {isSubmitting ? "กำลังลงทะเบียน..." : "ลงทะเบียน"}
+            {isSubmitting
+              ? "กำลังลงทะเบียน..."
+              : `ลงทะเบียนในฐานะ${role === "student" ? "นักศึกษา" : "อาจารย์"}`}
           </button>
         </form>
 
