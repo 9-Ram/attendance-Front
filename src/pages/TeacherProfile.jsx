@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { User, Phone, IdCard, Lock, Loader, Loader2 } from "lucide-react";
+import { User, Phone, IdCard, Lock, Loader2 } from "lucide-react";
 import Footer from "../components/footer";
 import Header from "../components/header";
 import Swal from "sweetalert2";
@@ -8,12 +8,22 @@ import { API_URL } from "./Subject";
 
 export default function ProfessorProfile() {
   const [isEdit, setIsEdit] = useState(false);
-
   const [professor, setProfessor] = useState({});
+  const [formData, setFormData] = useState({}); // ✅ แก้ 1: เริ่มเป็น {} ไม่ใช่ professor
+
+  // ✅ แก้ 2: sync formData ทุกครั้งที่ professor มีค่าใหม่
+  useEffect(() => {
+    setFormData(professor);
+  }, [professor]);
 
   const getProfessor = async () => {
     try {
-      const token = JSON.parse(localStorage.getItem("loginToken")).data;
+      const raw = localStorage.getItem("loginToken");
+      if (!raw) return; // ✅ แก้ 3: guard - ยังไม่ได้ login
+
+      const token = JSON.parse(raw).data;
+      if (!token?.id) return; // ✅ แก้ 4: guard - ไม่มี id อย่าเรียก API
+
       const res = await axios.get(API_URL + `/get-professor/${token.id}`);
       setProfessor(res.data.data);
     } catch (error) {
@@ -21,11 +31,10 @@ export default function ProfessorProfile() {
       Swal.fire("โปรดตรวจสอบเครือข่ายแล้วลองอีกครั้ง", "", "error");
     }
   };
+
   useEffect(() => {
     getProfessor();
   }, []);
-
-  const [formData, setFormData] = useState(professor);
 
   const handleEdit = () => {
     setFormData(professor);
@@ -40,26 +49,33 @@ export default function ProfessorProfile() {
   const [load, setLoad] = useState(false);
   const handleSave = async () => {
     try {
-      const token = JSON.parse(localStorage.getItem("loginToken")).data;
+      setLoad(true); // ✅ แก้ 5: ต้อง setLoad(true) ก่อนเรียก API
+      const raw = localStorage.getItem("loginToken");
+      if (!raw) return;
+
+      const token = JSON.parse(raw).data;
+      if (!token?.id) return;
+
       const res = await axios.put(
         API_URL + `/update-professor/${token.id}`,
-        formData,
+        formData
       );
+
       if (res.data.err) {
         return Swal.fire(res.data.err, "", "warning");
       }
 
       if (res.status === 200) {
         Swal.fire("บันทึกข้อมูลสำเร็จ", "", "success");
+        setProfessor(formData);
+        setIsEdit(false);
       }
     } catch (error) {
       console.error(error);
-      Swal.fire("โปรดตรสจสอบเครือข่าย", "", "error");
+      Swal.fire("โปรดตรวจสอบเครือข่าย", "", "error");
     } finally {
       setLoad(false);
     }
-    setProfessor(formData);
-    setIsEdit(false);
   };
 
   return (
@@ -75,33 +91,26 @@ export default function ProfessorProfile() {
 
           {/* Content */}
           <div className="p-6 space-y-6">
-            {/* Fullname */}
             <ProfileItem
               icon={<User />}
               label="ชื่อ-นามสกุล"
-              value={formData.fullname || professor?.fullname}
+              value={formData.fullname}
               isEdit={isEdit}
               onChange={(v) => setFormData({ ...formData, fullname: v })}
             />
-
-            {/* Username (readonly) */}
             <ProfileItem
               icon={<IdCard />}
               label="รหัสผู้ใช้งาน"
-              value={formData.username || professor.username}
+              value={formData.username}
               disabled
             />
-
-            {/* Telephone */}
             <ProfileItem
               icon={<Phone />}
               label="หมายเลขโทรศัพท์"
-              value={formData.tel || professor.tel}
+              value={formData.tel}
               isEdit={isEdit}
               onChange={(v) => setFormData({ ...formData, tel: v })}
             />
-
-            {/* Password */}
             <div className="flex items-center gap-4 opacity-60">
               <Lock className="text-blue-500" />
               <div>
@@ -133,7 +142,7 @@ export default function ProfessorProfile() {
                   onClick={handleSave}
                   className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700"
                 >
-                  {load ? <Loader2 className="animate-spin" /> : "  บันทึก"}
+                  {load ? <Loader2 className="animate-spin" /> : "บันทึก"}
                 </button>
               </>
             )}
@@ -145,26 +154,16 @@ export default function ProfessorProfile() {
   );
 }
 
-/* ---------- Reusable Component ---------- */
-function ProfileItem({
-  icon,
-  label,
-  value,
-  isEdit,
-  onChange,
-  disabled = false,
-}) {
-  console.log("🚀 ~ ProfileItem ~ value:", value);
+function ProfileItem({ icon, label, value, isEdit, onChange, disabled = false }) {
   return (
     <div className="flex items-center gap-4">
       <div className="text-blue-500">{icon}</div>
       <div className="flex-1">
         <p className="text-sm text-gray-500">{label}</p>
-
         {isEdit && !disabled ? (
           <input
             type="text"
-            value={value}
+            value={value || ""}
             onChange={(e) => onChange(e.target.value)}
             className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-400"
           />
